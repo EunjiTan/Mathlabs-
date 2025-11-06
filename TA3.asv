@@ -1,0 +1,329 @@
+clear all;
+clc;
+close all; 
+
+%% INPUT DATA - REPLACE WITH YOUR OBSERVED DATA
+inter_arrival_times = [2, 3, 1, 5, 2, 4, 1, 3, 2]; 
+
+
+service_times = [4, 3, 2, 5, 4, 3, 3, 4, 2, 3];
+
+% PERSONALIZATION - Enter your name here
+analyst_name = 'Your Name'; 
+
+%% DISPLAY INPUT DATA
+disp('========================================');
+disp('   QUEUING SYSTEM SIMULATION');
+disp('========================================');
+disp(' ');
+disp('INPUT DATA:');
+disp('------------------------------------------');
+fprintf('Number of Customers: %d\n', length(service_times));
+disp(' ');
+disp('Inter-Arrival Times (minutes):');
+disp(inter_arrival_times);
+disp(' ');
+disp('Service Times (minutes):');
+disp(service_times);
+disp(' ');
+
+%% INITIALIZE SIMULATION MATRIX
+% Matrix: 10 rows (customers) × 7 columns
+% Columns: [Customer#, Arrival, Service, Begin, Wait, End, TimeInSystem]
+num_customers = length(service_times);
+simulation_results = zeros(num_customers, 7);
+
+%% POPULATE CUSTOMER NUMBERS (Column 1)
+for i = 1:num_customers
+    simulation_results(i, 1) = i;
+end
+
+%% CALCULATE ARRIVAL TIMES (Column 2)
+% First customer arrives at time 0
+simulation_results(1, 2) = 0;
+
+% Subsequent customers: arrival = previous_arrival + inter_arrival_time
+for i = 2:num_customers
+    simulation_results(i, 2) = simulation_results(i-1, 2) + inter_arrival_times(i-1);
+end
+
+%% ASSIGN SERVICE TIMES (Column 3)
+simulation_results(:, 3) = service_times';
+
+%% CALCULATE TIME SERVICE BEGINS (Column 4)
+% First customer begins service immediately upon arrival
+simulation_results(1, 4) = simulation_results(1, 2);
+
+% For subsequent customers:
+% Service begins = max(arrival_time, previous_customer_end_time)
+for i = 2:num_customers
+    % Previous customer's service end time
+    prev_end_time = simulation_results(i-1, 6);
+    % Current customer's arrival time
+    current_arrival = simulation_results(i, 2);
+    % Service begins when both server is free AND customer has arrived
+    simulation_results(i, 4) = max(current_arrival, prev_end_time);
+end
+
+%% CALCULATE WAITING TIME (Column 5)
+% Waiting time = Time service begins - Arrival time
+simulation_results(:, 5) = simulation_results(:, 4) - simulation_results(:, 2);
+
+%% CALCULATE TIME SERVICE ENDS (Column 6)
+% End time = Time service begins + Service time
+simulation_results(:, 6) = simulation_results(:, 4) + simulation_results(:, 3);
+
+%% CALCULATE TIME IN SYSTEM (Column 7)
+% Time in system = Time service ends - Arrival time
+% OR: Time in system = Waiting time + Service time
+simulation_results(:, 7) = simulation_results(:, 6) - simulation_results(:, 2);
+
+%% DISPLAY SIMULATION RESULTS TABLE
+disp('========================================');
+disp('   SIMULATION RESULTS');
+disp('========================================');
+disp(' ');
+disp('Customer | Arrival | Service | Begin | Wait | End | Total');
+disp('   #     |  Time   |  Time   | Time  | Time | Time| Time ');
+disp('---------|---------|---------|-------|------|-----|-------');
+
+for i = 1:num_customers
+    fprintf('   %2d    |  %5.1f  |  %5.1f  | %5.1f | %4.1f | %5.1f| %5.1f\n', ...
+        simulation_results(i,1), simulation_results(i,2), ...
+        simulation_results(i,3), simulation_results(i,4), ...
+        simulation_results(i,5), simulation_results(i,6), ...
+        simulation_results(i,7));
+end
+disp(' ');
+
+%% CALCULATE PERFORMANCE METRICS
+% 1. Average Waiting Time
+avg_waiting_time = mean(simulation_results(:, 5));
+
+% 2. Probability that a customer has to wait
+% Count customers with waiting time > 0
+customers_who_waited = sum(simulation_results(:, 5) > 0);
+prob_customer_waits = customers_who_waited / num_customers;
+
+% 3. Server Utilization
+% Total service time / Total simulation time
+total_service_time = sum(simulation_results(:, 3));
+total_simulation_time = max(simulation_results(:, 6)); % Last customer's end time
+server_utilization = total_service_time / total_simulation_time;
+
+% 4. Maximum Waiting Time
+max_waiting_time = max(simulation_results(:, 5));
+
+% 5. Average Time in System
+avg_time_in_system = mean(simulation_results(:, 7));
+
+%% DISPLAY PERFORMANCE METRICS
+disp('========================================');
+disp('   PERFORMANCE METRICS');
+disp('========================================');
+disp(' ');
+fprintf('Average Waiting Time:           %.2f minutes\n', avg_waiting_time);
+fprintf('Probability Customer Waits:     %.2f%% (%d out of %d)\n', ...
+    prob_customer_waits*100, customers_who_waited, num_customers);
+fprintf('Server Utilization:             %.2f%%\n', server_utilization*100);
+fprintf('Maximum Waiting Time:           %.2f minutes\n', max_waiting_time);
+fprintf('Average Time in System:         %.2f minutes\n', avg_time_in_system);
+disp(' ');
+
+%% ADDITIONAL STATISTICS
+disp('========================================');
+disp('   ADDITIONAL STATISTICS');
+disp('========================================');
+disp(' ');
+fprintf('Total Customers Served:         %d\n', num_customers);
+fprintf('Total Simulation Time:          %.2f minutes\n', total_simulation_time);
+fprintf('Total Service Time:             %.2f minutes\n', total_service_time);
+fprintf('Total Waiting Time (All):       %.2f minutes\n', sum(simulation_results(:, 5)));
+fprintf('Average Service Time:           %.2f minutes\n', mean(service_times));
+fprintf('Average Inter-Arrival Time:     %.2f minutes\n', mean(inter_arrival_times));
+disp(' ');
+
+%% INTERPRETATION
+disp('========================================');
+disp('   SYSTEM INTERPRETATION');
+disp('========================================');
+disp(' ');
+
+% Interpret server utilization
+if server_utilization < 0.50
+    disp('Server Utilization: LOW - Server has significant idle time.');
+    disp('Recommendation: Current capacity is more than sufficient.');
+elseif server_utilization < 0.75
+    disp('Server Utilization: MODERATE - System is operating efficiently.');
+    disp('Recommendation: Current setup is balanced.');
+elseif server_utilization < 0.90
+    disp('Server Utilization: HIGH - System is busy but manageable.');
+    disp('Recommendation: Monitor during peak hours.');
+else
+    disp('Server Utilization: VERY HIGH - Server is overloaded.');
+    disp('Recommendation: Consider adding another server or improving service time.');
+end
+
+disp(' ');
+
+% Interpret waiting times
+if avg_waiting_time < 2
+    disp('Average Wait: EXCELLENT - Customers experience minimal wait time.');
+elseif avg_waiting_time < 5
+    disp('Average Wait: GOOD - Wait times are acceptable.');
+elseif avg_waiting_time < 10
+    disp('Average Wait: FAIR - Some customers may be dissatisfied.');
+else
+    disp('Average Wait: POOR - Long wait times may lead to customer loss.');
+end
+
+disp(' ');
+disp('========================================');
+disp('   END OF SIMULATION');
+disp('========================================');
+disp(' ');
+
+%% GENERATE COMPREHENSIVE VISUALIZATION
+disp('Generating comprehensive graph...');
+disp(' ');
+
+% Extract data for plotting
+customer_numbers = simulation_results(:, 1);
+arrival_times = simulation_results(:, 2);
+service_times_data = simulation_results(:, 3);
+begin_times = simulation_results(:, 4);
+waiting_times = simulation_results(:, 5);
+end_times = simulation_results(:, 6);
+time_in_system = simulation_results(:, 7);
+
+%% CREATE SINGLE COMPREHENSIVE FIGURE
+figure('Position', [100, 100, 1400, 700], 'Color', 'white');
+
+%% SUBPLOT 1: Customer Timeline (Gantt Chart)
+subplot(2,3,1);
+hold on;
+for i = 1:num_customers
+    % Waiting time (red/orange)
+    if waiting_times(i) > 0
+        rectangle('Position', [arrival_times(i), i-0.4, waiting_times(i), 0.8], ...
+            'FaceColor', [1, 0.6, 0.6], 'EdgeColor', [0.8, 0, 0], 'LineWidth', 1.5);
+    end
+    % Service time (green)
+    rectangle('Position', [begin_times(i), i-0.4, service_times_data(i), 0.8], ...
+        'FaceColor', [0.6, 1, 0.6], 'EdgeColor', [0, 0.6, 0], 'LineWidth', 1.5);
+end
+hold off;
+xlabel('Time (minutes)', 'FontSize', 10, 'FontWeight', 'bold');
+ylabel('Customer Number', 'FontSize', 10, 'FontWeight', 'bold');
+title('Customer Timeline', 'FontSize', 11, 'FontWeight', 'bold');
+legend('Waiting', 'Service', 'Location', 'best', 'FontSize', 9);
+grid on;
+ylim([0, num_customers+1]);
+yticks(1:num_customers);
+
+%% SUBPLOT 2: Waiting Times by Customer
+subplot(2,3,2);
+bar(customer_numbers, waiting_times, 'FaceColor', [0.2, 0.4, 0.8], 'EdgeColor', 'k');
+xlabel('Customer Number', 'FontSize', 10, 'FontWeight', 'bold');
+ylabel('Waiting Time (min)', 'FontSize', 10, 'FontWeight', 'bold');
+title('Waiting Time per Customer', 'FontSize', 11, 'FontWeight', 'bold');
+grid on;
+hold on;
+yline(avg_waiting_time, 'r--', 'LineWidth', 2);
+text(num_customers*0.7, avg_waiting_time*1.1, sprintf('Avg: %.2f', avg_waiting_time), ...
+    'FontSize', 9, 'FontWeight', 'bold', 'Color', 'r');
+hold off;
+
+%% SUBPLOT 3: Time in System Breakdown (Stacked)
+subplot(2,3,3);
+bar(customer_numbers, [waiting_times, service_times_data], 'stacked');
+xlabel('Customer Number', 'FontSize', 10, 'FontWeight', 'bold');
+ylabel('Time (minutes)', 'FontSize', 10, 'FontWeight', 'bold');
+title('Time in System (Waiting + Service)', 'FontSize', 11, 'FontWeight', 'bold');
+legend('Wait', 'Service', 'Location', 'best', 'FontSize', 9);
+grid on;
+
+%% SUBPLOT 4: Queue Length Over Time
+subplot(2,3,4);
+% Calculate queue length at each event time
+all_times = sort([arrival_times; end_times]);
+queue_length = zeros(size(all_times));
+
+for i = 1:length(all_times)
+    current_time = all_times(i);
+    queue_length(i) = sum(arrival_times <= current_time) - sum(end_times < current_time);
+end
+
+stairs(all_times, queue_length, 'LineWidth', 2.5, 'Color', [0.8, 0.4, 0]);
+xlabel('Time (minutes)', 'FontSize', 10, 'FontWeight', 'bold');
+ylabel('Customers in System', 'FontSize', 10, 'FontWeight', 'bold');
+title('Queue Length Over Time', 'FontSize', 11, 'FontWeight', 'bold');
+grid on;
+ylim([0, max(queue_length)+1]);
+
+%% SUBPLOT 5: Performance Metrics Bar Chart
+subplot(2,3,5);
+metrics_names = {'Avg Wait', 'Max Wait', 'Avg Service', 'Avg Total'};
+metrics_values = [avg_waiting_time, max_waiting_time, mean(service_times_data), avg_time_in_system];
+colors = [0.2 0.5 0.8; 0.8 0.3 0.3; 0.4 0.7 0.4; 0.6 0.4 0.8];
+
+b = bar(metrics_values);
+b.FaceColor = 'flat';
+for i = 1:length(metrics_values)
+    b.CData(i,:) = colors(i,:);
+end
+
+set(gca, 'XTickLabel', metrics_names, 'FontSize', 9);
+ylabel('Time (minutes)', 'FontSize', 10, 'FontWeight', 'bold');
+title('Key Performance Metrics', 'FontSize', 11, 'FontWeight', 'bold');
+grid on;
+
+% Add values on bars
+hold on;
+for i = 1:length(metrics_values)
+    text(i, metrics_values(i), sprintf('%.2f', metrics_values(i)), ...
+        'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
+        'FontSize', 9, 'FontWeight', 'bold');
+end
+hold off;
+
+%% SUBPLOT 6: Performance Summary (Text Box)
+subplot(2,3,6);
+axis off;
+
+% Create formatted summary box
+summary_text = {
+    '┌─────────────────────────────────┐';
+    '│   PERFORMANCE SUMMARY      │';
+    '└─────────────────────────────────┘';
+    ' ';
+    sprintf('Average Waiting Time: %.2f min', avg_waiting_time);
+    sprintf('Maximum Waiting Time: %.2f min', max_waiting_time);
+    sprintf('Average Time in System: %.2f min', avg_time_in_system);
+    ' ';
+    sprintf('Server Utilization: %.1f%%', server_utilization*100);
+    sprintf('Customers Who Waited: %d/%d', customers_who_waited, num_customers);
+    sprintf('Probability of Wait: %.0f%%', prob_customer_waits*100);
+    ' ';
+    sprintf('Total Simulation: %.1f min', total_simulation_time);
+    sprintf('Total Service Time: %.1f min', total_service_time);
+    sprintf('Average Service Time: %.2f min', mean(service_times_data));
+    sprintf('Avg Inter-Arrival: %.2f min', mean(inter_arrival_times));
+};
+
+text(0.5, 0.5, summary_text, 'FontSize', 10, 'FontWeight', 'bold', ...
+    'FontName', 'FixedWidth', 'HorizontalAlignment', 'center', ...
+    'VerticalAlignment', 'middle');
+
+% Add box around text
+rectangle('Position', [0.05, 0.05, 0.9, 0.9], 'EdgeColor', 'k', 'LineWidth', 2);
+
+%% Add main title with analyst name
+sgtitle(sprintf('QUEUING SYSTEM ANALYSIS  |  Analyzed by: %s', analyst_name), ...
+    'FontSize', 16, 'FontWeight', 'bold', 'Color', [0.1, 0.1, 0.5]);
+
+disp('Comprehensive graph generated successfully!');
+disp(' ');
+disp('========================================');
+disp('   VISUALIZATION COMPLETED');
+disp('========================================');
